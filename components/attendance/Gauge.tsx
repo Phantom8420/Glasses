@@ -56,7 +56,7 @@ export function Gauge({
       <path
         d={arcPath}
         fill="none"
-        stroke="#242424"
+        style={{ stroke: "rgb(var(--c-border))" }}
         strokeWidth="12"
         strokeLinecap="round"
       />
@@ -79,7 +79,7 @@ export function Gauge({
         y1={tickInner.y}
         x2={tickOuter.x}
         y2={tickOuter.y}
-        stroke="#FFFFFF"
+        style={{ stroke: "rgb(var(--c-text))" }}
         strokeWidth="3"
         strokeLinecap="round"
       />
@@ -91,7 +91,7 @@ export function Gauge({
             transition: "transform 0.5s ease",
           }}
         >
-          <circle cx={CX} cy={CY} r="7" fill="#000000" />
+          <circle cx={CX} cy={CY} r="7" style={{ fill: "rgb(var(--c-bg))" }} />
           <circle cx={CX} cy={CY} r="7" fill="none" stroke={color} strokeWidth="3" />
         </g>
       )}
@@ -112,8 +112,7 @@ export function Gauge({
         y="102"
         textAnchor="middle"
         fontSize="11"
-        fill="#9A9A9A"
-        style={{ textTransform: "uppercase", letterSpacing: "0.08em" }}
+        style={{ fill: "rgb(var(--c-muted))", textTransform: "uppercase", letterSpacing: "0.08em" }}
       >
         {label}
       </text>

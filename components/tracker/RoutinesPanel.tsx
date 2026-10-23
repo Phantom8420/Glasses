@@ -55,7 +55,7 @@ export function RoutinesPanel() {
                 onClick={() => setColor(c)}
                 className={cx(
                   "h-6 w-6 rounded-full border-2 transition-colors",
-                  color === c ? "border-white" : "border-transparent",
+                  color === c ? "border-text-primary" : "border-transparent",
                 )}
                 style={{ backgroundColor: c }}
               />

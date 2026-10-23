@@ -7,23 +7,23 @@ const config: Config = {
       colors: {
         // Strict black/white base. Grays are white-over-black tones only —
         // no other neutral hue.
-        bg: "#000000",
-        surface: "#0C0C0C",
-        border: "#242424",
-        "text-primary": "#FFFFFF",
-        "text-secondary": "#9A9A9A",
+        bg: "rgb(var(--c-bg) / <alpha-value>)",
+        surface: "rgb(var(--c-surface) / <alpha-value>)",
+        border: "rgb(var(--c-border) / <alpha-value>)",
+        "text-primary": "rgb(var(--c-text) / <alpha-value>)",
+        "text-secondary": "rgb(var(--c-muted) / <alpha-value>)",
 
         // The only permitted colours: royal red / blue / green + neon shades.
         // Semantics: blue = primary/interactive, green = safe (>= threshold),
         // red = danger (< threshold).
         accent: "#2E5BFF", // royal blue (primary)
-        "accent-neon": "#5B8CFF",
+        "accent-neon": "rgb(var(--c-blue-neon) / <alpha-value>)",
         blue: "#2E5BFF",
-        "blue-neon": "#5B8CFF",
+        "blue-neon": "rgb(var(--c-blue-neon) / <alpha-value>)",
         red: "#E11030", // royal red
-        "red-neon": "#FF2D55",
-        green: "#17C964", // light royal green
-        "green-neon": "#37FF8B",
+        "red-neon": "rgb(var(--c-red-neon) / <alpha-value>)",
+        green: "rgb(var(--c-green) / <alpha-value>)", // light royal green
+        "green-neon": "rgb(var(--c-green-neon) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

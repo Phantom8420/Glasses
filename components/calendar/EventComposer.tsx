@@ -88,7 +88,7 @@ export function EventComposer({ date }: { date: string }) {
               onClick={() => setColor(c)}
               className={cx(
                 "h-5 w-5 rounded-full border-2 transition-colors",
-                color === c ? "border-white" : "border-transparent",
+                color === c ? "border-text-primary" : "border-transparent",
               )}
               style={{ backgroundColor: c }}
             />

@@ -74,7 +74,7 @@ function ColorPicker({
           onClick={() => onChange(c)}
           className={cx(
             "h-5 w-5 rounded-full border-2 transition-colors",
-            value === c ? "border-white" : "border-transparent",
+            value === c ? "border-text-primary" : "border-transparent",
           )}
           style={{ backgroundColor: c }}
         />

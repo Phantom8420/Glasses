@@ -3,17 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "./ui";
+import { useData } from "./DataProvider";
 
-type Tab = {
+export type Tab = {
+  id: string;
+  blurb: string;
   href: string;
   label: string;
   icon: (active: boolean) => React.ReactNode;
   isActive: (pathname: string) => boolean;
 };
 
-const TABS: Tab[] = [
+export const TABS: Tab[] = [
   {
     href: "/",
+    id: "calendar",
+    blurb: "Classes, events and deadlines in one view",
     label: "Calendar",
     isActive: (p) => p === "/",
     icon: () => (
@@ -35,6 +40,8 @@ const TABS: Tab[] = [
   },
   {
     href: "/attendance",
+    id: "attendance",
+    blurb: "Track presence against each course's threshold",
     label: "Attendance",
     isActive: (p) => p.startsWith("/attendance"),
     icon: () => (
@@ -55,6 +62,8 @@ const TABS: Tab[] = [
   },
   {
     href: "/tracker",
+    id: "tracker",
+    blurb: "Habits, to-dos, routines and notes",
     label: "Tracker",
     isActive: (p) => p.startsWith("/tracker"),
     icon: () => (
@@ -75,7 +84,31 @@ const TABS: Tab[] = [
     ),
   },
   {
+    href: "/voice",
+    id: "voice",
+    blurb: "Speak a command: add tasks, log spending, mark attendance",
+    label: "Voice",
+    isActive: (p) => p.startsWith("/voice"),
+    icon: () => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-6 w-6"
+      >
+        <rect x="9" y="3" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <line x1="12" y1="18" x2="12" y2="21" />
+      </svg>
+    ),
+  },
+  {
     href: "/money",
+    id: "money",
+    blurb: "Spending, budgets and what you want to buy",
     label: "Money",
     isActive: (p) => p.startsWith("/money"),
     icon: () => (
@@ -95,6 +128,8 @@ const TABS: Tab[] = [
   },
   {
     href: "/learning",
+    id: "learning",
+    blurb: "Goals, resources and what you're studying",
     label: "Learning",
     isActive: (p) => p.startsWith("/learning"),
     icon: () => (
@@ -117,11 +152,13 @@ const TABS: Tab[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { db } = useData();
+  const tabs = TABS.filter((t) => !db.settings.features || db.settings.features.includes(t.id));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = tab.isActive(pathname);
           return (
             <Link

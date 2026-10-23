@@ -42,6 +42,9 @@ import { materialiseRecurring } from "./money";
 // state, applies one, persists, and re-renders.
 // ---------------------------------------------------------------------------
 
+/** Tab ids; keep in sync with TABS in components/BottomNav.tsx. */
+export const ALL_FEATURES = ["calendar", "attendance", "tracker", "money", "learning", "voice"];
+
 export interface DB {
   semester: Semester | null;
   courses: Course[];
@@ -93,7 +96,7 @@ export function emptyDB(): DB {
     goals: [],
     resources: [],
     notes: [],
-    settings: { currency: "₹" },
+    settings: { currency: "₹", features: null },
     seq: 1,
   };
 }
@@ -293,7 +296,15 @@ export function normalizeDB(input: unknown): DB {
     goals: d.goals ?? [],
     resources: d.resources ?? [],
     notes: d.notes ?? [],
-    settings: { currency: d.settings?.currency || "₹" },
+    settings: {
+      currency: d.settings?.currency || "₹",
+      // A save from before onboarding existed keeps every tab; only a fresh
+      // install (explicit null) goes through setup.
+      features:
+        d.settings?.features === undefined
+          ? ALL_FEATURES
+          : d.settings.features,
+    },
     seq: d.seq ?? base.seq,
   };
 

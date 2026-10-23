@@ -81,7 +81,7 @@ export function DayColumn({
                 key={c.instanceId ?? `t-${i}`}
                 className={cx(
                   "rounded border-l-2 bg-bg px-2 py-1.5",
-                  materialised && "border border-white/70",
+                  materialised && "border border-text-primary/70",
                   cancelled && "opacity-45",
                 )}
                 style={{ borderLeftColor: cancelled ? "#242424" : c.color }}

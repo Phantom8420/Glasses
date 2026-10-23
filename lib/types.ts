@@ -228,6 +228,8 @@ export interface WishlistItem {
 
 export interface Settings {
   currency: string;
+  /** Tab ids the user picked at first run. null = hasn't done setup yet. */
+  features: string[] | null;
 }
 
 export interface LearningGoal {

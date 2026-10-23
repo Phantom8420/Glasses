@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 import { DataProvider } from "@/components/DataProvider";
+import { Onboarding } from "@/components/Onboarding";
 
 const sans = Instrument_Sans({
   subsets: ["latin"],
@@ -35,9 +36,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Apply the saved theme before first paint to avoid a dark flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("glasses-theme");if(t==="light")document.documentElement.dataset.theme="light"}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-screen bg-bg font-sans text-text-primary antialiased">
         <DataProvider>
+          <Onboarding />
           <div className="mx-auto flex min-h-screen max-w-2xl flex-col">
             {/* Brand stays optically centred; Setup lives here rather than in
                 the tab bar, which is reserved for the daily-use screens. */}

@@ -12,6 +12,8 @@ import { LoadOddSem2026 } from "./LoadOddSem2026";
 import { RecurringEventManager } from "./RecurringEventManager";
 import { DeleteTimetable } from "./DeleteTimetable";
 import { CurrencyForm } from "./CurrencyForm";
+import { FeaturesForm } from "./FeaturesForm";
+import { ThemeForm } from "./ThemeForm";
 
 export function SetupScreen() {
   const { db, ready } = useData();
@@ -45,7 +47,13 @@ export function SetupScreen() {
       </section>
 
       <section className="flex flex-col gap-4">
+        <SectionTitle>Tabs</SectionTitle>
+        <FeaturesForm />
+      </section>
+
+      <section className="flex flex-col gap-4">
         <SectionTitle>General</SectionTitle>
+        <ThemeForm />
         <CurrencyForm />
       </section>
 
