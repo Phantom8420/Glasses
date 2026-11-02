@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 import { useData } from "../DataProvider";
 import { btn, Card, cx, SectionTitle } from "../ui";
 import { describe, parseCommand, runIntent, type Intent } from "@/lib/voice";
@@ -32,7 +34,27 @@ export function VoiceScreen() {
   const [log, setLog] = useState<{ msg: string; ok: boolean }[]>([]);
   const rec = useRef<Rec | null>(null);
 
+  const native = useRef(false);
+
   useEffect(() => {
+    // The Android WebView has no Web Speech API, so use the system recognizer there.
+    if (Capacitor.isNativePlatform()) {
+      native.current = true;
+      SpeechRecognition.available().then(
+        (r) => { if (!r.available) setSupported(false); },
+        () => setSupported(false),
+      );
+      const subs = [
+        SpeechRecognition.addListener("partialResults", (e) => setText(e.matches?.[0] ?? "")),
+        SpeechRecognition.addListener("listeningState", (e) => {
+          if (e.status === "stopped") setListening(false);
+        }),
+      ];
+      return () => {
+        subs.forEach((p) => p.then((h) => h.remove()));
+        SpeechRecognition.stop().catch(() => {});
+      };
+    }
     const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) { setSupported(false); return; }
@@ -52,7 +74,33 @@ export function VoiceScreen() {
     return () => r.stop();
   }, []);
 
+  async function toggleNative() {
+    if (listening) {
+      await SpeechRecognition.stop().catch(() => {});
+      setListening(false);
+      return;
+    }
+    try {
+      const perm = await SpeechRecognition.requestPermissions();
+      if (perm.speechRecognition !== "granted") {
+        setLog((l) => [{ msg: "Microphone permission denied. Allow it in Android settings, or type a command.", ok: false }, ...l]);
+        return;
+      }
+      setText(""); setPending(null);
+      setListening(true);
+      await SpeechRecognition.start({
+        language: navigator.language || "en-US",
+        partialResults: true,
+        popup: false,
+      });
+    } catch (e) {
+      setListening(false);
+      setLog((l) => [{ msg: `Mic error: ${e instanceof Error ? e.message : String(e)}`, ok: false }, ...l]);
+    }
+  }
+
   function toggle() {
+    if (native.current) { void toggleNative(); return; }
     if (!rec.current) return;
     if (listening) { rec.current.stop(); return; }
     setText(""); setPending(null);
