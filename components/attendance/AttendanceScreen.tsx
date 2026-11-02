@@ -10,7 +10,7 @@ import { todayISO, formatDayLabel, formatTime } from "@/lib/time";
 import { Gauge } from "./Gauge";
 import { AttendanceMark } from "./AttendanceMark";
 import { CourseAttendanceCalendar } from "./CourseAttendanceCalendar";
-import { SectionTitle, Card, cx } from "../ui";
+import { Card, cx } from "../ui";
 import Link from "next/link";
 
 export function AttendanceScreen() {
@@ -48,13 +48,6 @@ export function AttendanceScreen() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <SectionTitle>Attendance</SectionTitle>
-        <span className="font-mono text-xs text-text-secondary">
-          {db.semester.name}
-        </span>
-      </div>
-
       {/* Marking queue */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

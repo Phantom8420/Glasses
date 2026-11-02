@@ -39,11 +39,11 @@ export const TABS: Tab[] = [
     ),
   },
   {
-    href: "/attendance",
-    id: "attendance",
-    blurb: "Track presence against each course's threshold",
-    label: "Attendance",
-    isActive: (p) => p.startsWith("/attendance"),
+    href: "/studies",
+    id: "studies",
+    blurb: "Exam countdowns and attendance against each threshold",
+    label: "Studies",
+    isActive: (p) => p.startsWith("/studies"),
     icon: () => (
       <svg
         viewBox="0 0 24 24"
@@ -54,9 +54,8 @@ export const TABS: Tab[] = [
         strokeLinejoin="round"
         className="h-6 w-6"
       >
-        <path d="M4 16a8 8 0 0 1 16 0" />
-        <line x1="12" y1="16" x2="15.5" y2="10.5" />
-        <circle cx="12" cy="16" r="1.4" fill="currentColor" stroke="none" />
+        <path d="M2 9l10-5 10 5-10 5-10-5Z" />
+        <path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" />
       </svg>
     ),
   },

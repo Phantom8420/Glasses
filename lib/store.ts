@@ -24,6 +24,8 @@ import type {
   WishlistItem,
   Settings,
   LearningGoal,
+  Exam,
+  Confidence,
   LearningResource,
   GoalStatus,
   Note,
@@ -43,7 +45,7 @@ import { materialiseRecurring } from "./money";
 // ---------------------------------------------------------------------------
 
 /** Tab ids; keep in sync with TABS in components/BottomNav.tsx. */
-export const ALL_FEATURES = ["calendar", "attendance", "tracker", "money", "learning", "voice"];
+export const ALL_FEATURES = ["calendar", "studies", "tracker", "money", "learning", "voice"];
 
 export interface DB {
   semester: Semester | null;
@@ -65,6 +67,7 @@ export interface DB {
   budgets: Budget[];
   recurring: Recurring[];
   wishlist: WishlistItem[];
+  exams: Exam[];
   goals: LearningGoal[];
   resources: LearningResource[];
   notes: Note[];
@@ -93,6 +96,7 @@ export function emptyDB(): DB {
     budgets: [],
     recurring: [],
     wishlist: [],
+    exams: [],
     goals: [],
     resources: [],
     notes: [],
@@ -293,6 +297,7 @@ export function normalizeDB(input: unknown): DB {
     budgets: d.budgets ?? [],
     recurring: d.recurring ?? [],
     wishlist: d.wishlist ?? [],
+    exams: d.exams ?? [],
     goals: d.goals ?? [],
     resources: d.resources ?? [],
     notes: d.notes ?? [],
@@ -303,7 +308,8 @@ export function normalizeDB(input: unknown): DB {
       features:
         d.settings?.features === undefined
           ? ALL_FEATURES
-          : d.settings.features,
+          : // Attendance moved inside the Studies tab.
+            d.settings.features?.map((f: string) => (f === "attendance" ? "studies" : f)) ?? null,
     },
     seq: d.seq ?? base.seq,
   };
@@ -1486,4 +1492,46 @@ export function deleteNote(db: DB, id: number) {
   db.notes = db.notes.filter((n) => n.id !== id);
 }
 
-export type { LearningGoal, LearningResource, Note };
+export type { LearningGoal, LearningResource, Note, Exam, Confidence };
+
+// ---- Exams -----------------------------------------------------------------
+
+export function addExam(
+  db: DB,
+  input: { title: string; date: string; courseId: number | null },
+) {
+  const title = input.title.trim();
+  if (!title || !input.date) return;
+  db.exams.push({
+    id: nextId(db),
+    title,
+    date: input.date,
+    course_id: input.courseId,
+    topics: [],
+  });
+}
+
+export function deleteExam(db: DB, id: number) {
+  db.exams = db.exams.filter((e) => e.id !== id);
+}
+
+export function addExamTopic(db: DB, examId: number, name: string) {
+  const e = db.exams.find((x) => x.id === examId);
+  const n = name.trim();
+  if (e && n) e.topics.push({ id: nextId(db), name: n, confidence: 0 });
+}
+
+export function setTopicConfidence(
+  db: DB,
+  examId: number,
+  topicId: number,
+  confidence: Confidence,
+) {
+  const t = db.exams.find((x) => x.id === examId)?.topics.find((x) => x.id === topicId);
+  if (t) t.confidence = confidence;
+}
+
+export function deleteExamTopic(db: DB, examId: number, topicId: number) {
+  const e = db.exams.find((x) => x.id === examId);
+  if (e) e.topics = e.topics.filter((t) => t.id !== topicId);
+}

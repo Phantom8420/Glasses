@@ -294,3 +294,20 @@ export interface RecurringEvent {
   note: string | null;
   color: string;
 }
+
+/** 0 = not rated yet, 1 = shaky, 2 = okay, 3 = solid. */
+export type Confidence = 0 | 1 | 2 | 3;
+
+export interface ExamTopic {
+  id: number;
+  name: string;
+  confidence: Confidence;
+}
+
+export interface Exam {
+  id: number;
+  title: string;
+  course_id: number | null;
+  date: string; // YYYY-MM-DD
+  topics: ExamTopic[];
+}
