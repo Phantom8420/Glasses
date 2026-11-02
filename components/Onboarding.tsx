@@ -35,7 +35,7 @@ export function Onboarding() {
   // Landing on a tab the user turned off goes to the first one they kept.
   useEffect(() => {
     if (!ready || !features || pathname.startsWith("/setup")) return;
-    const enabled = TABS.filter((t) => features.includes(t.id));
+    const enabled = TABS.filter((t) => t.id === "voice" || features.includes(t.id));
     if (enabled.length && !enabled.some((t) => t.isActive(pathname))) {
       router.replace(enabled[0].href);
     }

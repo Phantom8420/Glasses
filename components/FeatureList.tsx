@@ -15,7 +15,7 @@ export function FeatureList({
 }) {
   return (
     <ul className="flex flex-col gap-2">
-      {TABS.map((tab, i) => {
+      {TABS.filter((t) => t.id !== "voice").map((tab, i) => {
         const on = selected.includes(tab.id);
         return (
           <li

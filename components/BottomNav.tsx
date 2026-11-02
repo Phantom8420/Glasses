@@ -152,16 +152,19 @@ export const TABS: Tab[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const { db } = useData();
-  const shown = TABS.filter((t) => !db.settings.features || db.settings.features.includes(t.id));
-  const voice = shown.find((t) => t.id === "voice");
-  const tabs = shown.filter((t) => t.id !== "voice");
-  if (voice) tabs.splice(Math.floor(tabs.length / 2), 0, voice);
+  // Voice is always on; it sits in the middle as a raised round button.
+  const voice = TABS.find((t) => t.id === "voice")!;
+  const tabs = TABS.filter(
+    (t) => t.id !== "voice" && (!db.settings.features || db.settings.features.includes(t.id)),
+  );
+  tabs.splice(Math.floor(tabs.length / 2), 0, voice);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {tabs.map((tab) => {
           const active = tab.isActive(pathname);
+          const mic = tab.id === "voice";
           return (
             <Link
               key={tab.href}
@@ -172,7 +175,18 @@ export function BottomNav() {
                 active ? "text-accent" : "text-text-secondary",
               )}
             >
-              {tab.icon(active)}
+              {mic ? (
+                <span
+                  className={cx(
+                    "-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-lg ring-4 ring-bg",
+                    active && "brightness-110",
+                  )}
+                >
+                  {tab.icon(active)}
+                </span>
+              ) : (
+                tab.icon(active)
+              )}
               <span>{tab.label}</span>
             </Link>
           );

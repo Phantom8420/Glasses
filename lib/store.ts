@@ -45,7 +45,7 @@ import { materialiseRecurring } from "./money";
 // ---------------------------------------------------------------------------
 
 /** Tab ids; keep in sync with TABS in components/BottomNav.tsx. */
-export const ALL_FEATURES = ["calendar", "studies", "tracker", "money", "learning", "voice"];
+export const ALL_FEATURES = ["calendar", "studies", "tracker", "money", "learning"];
 
 export interface DB {
   semester: Semester | null;
