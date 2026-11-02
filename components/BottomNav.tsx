@@ -153,7 +153,10 @@ export const TABS: Tab[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const { db } = useData();
-  const tabs = TABS.filter((t) => !db.settings.features || db.settings.features.includes(t.id));
+  const shown = TABS.filter((t) => !db.settings.features || db.settings.features.includes(t.id));
+  const voice = shown.find((t) => t.id === "voice");
+  const tabs = shown.filter((t) => t.id !== "voice");
+  if (voice) tabs.splice(Math.floor(tabs.length / 2), 0, voice);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 backdrop-blur">
