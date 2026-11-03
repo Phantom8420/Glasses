@@ -29,12 +29,12 @@ export type Understood = { reply: string; intents: Intent[] };
 
 /** Turns a spoken sentence into a spoken reply plus actions. Returns null when Gemini is unreachable. */
 export async function understand(
-  text: string,
+  text: string | { audio: string },
   ctx: { today: string; weekday: string; courses: string[]; classes: string[]; tasks: string[] },
 ): Promise<Understood | null> {
   if (!KEY) return null;
   const system =
-    `You are the voice assistant of a personal organiser app. The user speaks; speech-to-text is often garbled ("at task" means "add task", "240 pm" means 2:40 pm). ` +
+    `You are the voice assistant of a personal organiser app. The user speaks; the input is either speech-to-text (often garbled) or a raw audio clip: listen to it; if it is silent or unintelligible, ask them to repeat and return no actions. Garbled examples ("at task" means "add task", "240 pm" means 2:40 pm). ` +
     `Reply in one short, friendly spoken sentence (no markdown, no emoji) and list the actions to perform. For questions, answer from the data below and return no actions; ` +
     `if asked something you can't do or don't know, say so briefly. Never claim an action is done unless you list it. ` +
     `Today is ${ctx.today} (${ctx.weekday}). Courses: ${ctx.courses.join(", ") || "none"}. ` +
@@ -45,7 +45,7 @@ export async function understand(
     `One utterance may hold several actions. Keep titles short, in the speaker's words.`;
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ parts: [{ text: numberWords(text) }] }],
+    contents: [{ parts: [typeof text === "string" ? { text: numberWords(text) } : { inlineData: { mimeType: "audio/wav", data: text.audio } }] }],
     generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
   });
   for (const model of MODELS) {
@@ -54,7 +54,7 @@ export async function understand(
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": KEY },
         body,
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(typeof text === "string" ? 5000 : 15000),
       });
       if (!res.ok) continue;
       const j = await res.json();

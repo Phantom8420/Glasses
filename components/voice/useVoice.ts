@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { SpeechRecognition } from "@capacitor-community/speech-recognition";
+import { startRecording } from "@/lib/recorder";
 import { useData } from "../DataProvider";
 import { describe, NOT_UNDERSTOOD, parseCommand, runIntent } from "@/lib/voice";
 import { understand } from "@/lib/llm";
@@ -39,30 +39,13 @@ function hush() {
   else if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
-/** One native listen. A stale session from the previous tap is stopped first; an instant empty result gets one retry. */
-async function listenNative(): Promise<string | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    await SpeechRecognition.stop().catch(() => {});
-    const t0 = Date.now();
-    try {
-      const r = await SpeechRecognition.start({ language: lang(), maxResults: 3, popup: false });
-      const text = r.matches?.find((m) => m.trim());
-      if (text) return text;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/no match|no speech|cancel|busy|already|client/i.test(msg)) throw e;
-    }
-    if (Date.now() - t0 > 800) return null; // the user really said nothing
-  }
-  return null;
-}
-
 /** Tap-to-talk: listens in the background, runs the command, answers out loud. */
 export function useVoice() {
   const { db, mutate } = useData();
   const [listening, setListening] = useState(false);
   const [status, setStatus] = useState<{ msg: string; ok: boolean } | null>(null);
   const web = useRef<WebRec | null>(null);
+  const rec = useRef<ReturnType<typeof startRecording> | null>(null);
   const busy = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -74,7 +57,7 @@ export function useVoice() {
   }, []);
 
   const handle = useCallback(
-    async (text: string) => {
+    async (text: string | { audio: string }) => {
       say("Thinking…", true);
       const today = todayISO();
       const names = new Map(getCourses(db).map((c) => [c.id, c.name]));
@@ -93,6 +76,7 @@ export function useVoice() {
       let intents = u?.intents ?? [];
       if (!intents.length && u?.reply) return say(u.reply, true, true);
       if (!intents.length) {
+        if (typeof text !== "string") return say(NOT_UNDERSTOOD, false, true);
         const k = parseCommand(text);
         intents = k.kind === "unknown" ? [] : [k];
       }
@@ -114,7 +98,7 @@ export function useVoice() {
   const toggle = useCallback(async () => {
     if (busy.current) {
       // second tap while listening = stop and use what was heard so far
-      if (native()) await SpeechRecognition.stop().catch(() => {});
+      if (native()) rec.current?.stop();
       else web.current?.stop();
       return;
     }
@@ -122,12 +106,12 @@ export function useVoice() {
     if (native()) {
       busy.current = true;
       try {
-        const perm = await SpeechRecognition.requestPermissions();
-        if (perm.speechRecognition !== "granted") return say("Microphone permission denied", false);
+        rec.current = startRecording();
         setListening(true);
         say("Listening…", true);
-        const text = await listenNative();
-        if (text) await handle(text);
+        const audio = await rec.current.done;
+        setListening(false);
+        if (audio) await handle({ audio });
         else say(NOT_UNDERSTOOD, false, true);
       } catch (e) {
         say(`Mic error: ${e instanceof Error ? e.message : String(e)}`, false);
