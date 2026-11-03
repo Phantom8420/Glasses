@@ -21,8 +21,16 @@ export type Intent =
 
 /** Rule-based: a handful of phrasings per action, no network, no model. */
 export function parseCommand(raw: string): Intent {
-  const s = raw.trim().replace(/[.!?]+$/, "");
+  // Drop filler the recognizer faithfully transcribes.
+  const s = raw
+    .trim()
+    .replace(/[.!?,]+$/, "")
+    .replace(/^(?:(?:hey|ok|okay|please|can you|could you|would you|i want to|i wanna|i need to|i have to|i should)\s+)+/i, "");
   let m: RegExpMatchArray | null;
+
+  if ((m = s.match(/^(?:add|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+)?(?:tasks?|to-?do(?:s| list)?|list)$/i)))
+    return { kind: "task", title: m[1] };
+  if ((m = s.match(/^(?:remember|don'?t forget)\s+(?:to\s+)?(.+)$/i))) return { kind: "task", title: m[1] };
 
   if ((m = s.match(/^(?:add|create|new)\s+(?:a\s+)?(?:task|todo|to-do|reminder)\s*(?:to|:)?\s+(.+)$/i)))
     return { kind: "task", title: m[1] };
@@ -34,6 +42,11 @@ export function parseCommand(raw: string): Intent {
   if ((m = s.match(/^(?:i\s+)?(?:spent|paid|bought)\s+(?:rs\.?|₹|\$)?\s*([\d,]+(?:\.\d+)?)\s*(?:rupees|rs|dollars|bucks)?\s*(?:on|for)?\s*(.*)$/i))) {
     const amount = parseAmount(m[1]);
     if (amount) return { kind: "expense", amount, item: m[2].trim() || "Voice entry" };
+  }
+
+  if ((m = s.match(/^([\d,]+(?:\.\d+)?)\s*(?:rupees|rs|dollars|bucks)?\s+(?:on|for)\s+(.+)$/i))) {
+    const amount = parseAmount(m[1]);
+    if (amount) return { kind: "expense", amount, item: m[2].trim() };
   }
 
   if ((m = s.match(/^(?:mark\s+)?(.+?)\s+(present|attended|absent)$/i)))

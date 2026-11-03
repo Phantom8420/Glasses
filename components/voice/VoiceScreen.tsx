@@ -44,16 +44,7 @@ export function VoiceScreen() {
         (r) => { if (!r.available) setSupported(false); },
         () => setSupported(false),
       );
-      const subs = [
-        SpeechRecognition.addListener("partialResults", (e) => setText(e.matches?.[0] ?? "")),
-        SpeechRecognition.addListener("listeningState", (e) => {
-          if (e.status === "stopped") setListening(false);
-        }),
-      ];
-      return () => {
-        subs.forEach((p) => p.then((h) => h.remove()));
-        SpeechRecognition.stop().catch(() => {});
-      };
+      return;
     }
     const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
@@ -74,12 +65,8 @@ export function VoiceScreen() {
     return () => r.stop();
   }, []);
 
+  // Google's own listening dialog: it handles silence, noise and the final result.
   async function toggleNative() {
-    if (listening) {
-      await SpeechRecognition.stop().catch(() => {});
-      setListening(false);
-      return;
-    }
     try {
       const perm = await SpeechRecognition.requestPermissions();
       if (perm.speechRecognition !== "granted") {
@@ -88,14 +75,20 @@ export function VoiceScreen() {
       }
       setText(""); setPending(null);
       setListening(true);
-      await SpeechRecognition.start({
+      const r = await SpeechRecognition.start({
         language: navigator.language || "en-US",
-        partialResults: true,
-        popup: false,
+        maxResults: 1,
+        prompt: "Say a command",
+        popup: true,
       });
+      setText(r.matches?.[0] ?? "");
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Closing the dialog without speaking isn't an error worth showing.
+      if (!/cancel|no match|no speech|back/i.test(msg))
+        setLog((l) => [{ msg: `Mic error: ${msg}`, ok: false }, ...l]);
+    } finally {
       setListening(false);
-      setLog((l) => [{ msg: `Mic error: ${e instanceof Error ? e.message : String(e)}`, ok: false }, ...l]);
     }
   }
 
@@ -114,6 +107,14 @@ export function VoiceScreen() {
     const i = parseCommand(text);
     setPending(i.kind === "unknown" ? null : i);
   }, [text, listening]);
+
+  function saveAs(kind: "task" | "note") {
+    const t = text.trim();
+    const intent: Intent = kind === "task" ? { kind, title: t } : { kind, text: t };
+    mutate((d) => { runIntent(d, intent); });
+    setLog((l) => [{ msg: describe(intent), ok: true }, ...l].slice(0, 20));
+    setText("");
+  }
 
   function confirm() {
     if (!pending) return;
@@ -149,7 +150,7 @@ export function VoiceScreen() {
           </svg>
         </button>
         <p className="text-sm text-text-secondary">
-          {!supported ? "Speech recognition isn't available here — type a command below." : listening ? "Listening…" : "Tap and speak"}
+          {!supported ? "Speech recognition isn't available here — type a command below." : listening ? "Listening…" : "Tap and say what you want"}
         </p>
       </div>
 
@@ -169,7 +170,15 @@ export function VoiceScreen() {
           </span>
         </Card>
       )}
-      {unrecognised && <p className="text-sm text-text-secondary">Didn&apos;t match a command. Try one of the examples below.</p>}
+      {unrecognised && (
+        <Card className="flex items-center justify-between gap-3 p-3">
+          <span className="text-sm text-text-secondary">Not sure what to do with that. Save it as…</span>
+          <span className="flex shrink-0 gap-1">
+            <button className={cx(btn.base, btn.ghost)} onClick={() => saveAs("note")}>Note</button>
+            <button className={cx(btn.base, btn.primary)} onClick={() => saveAs("task")}>Task</button>
+          </span>
+        </Card>
+      )}
 
       {log.length > 0 && (
         <ul className="flex flex-col gap-1.5">
