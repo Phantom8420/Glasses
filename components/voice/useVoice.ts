@@ -5,6 +5,11 @@ import { Capacitor } from "@capacitor/core";
 import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 import { useData } from "../DataProvider";
 import { describe, NOT_UNDERSTOOD, parseCommand, runIntent } from "@/lib/voice";
+import { understand } from "@/lib/llm";
+import { getCourses } from "@/lib/store";
+import { dayOfWeek, todayISO } from "@/lib/time";
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 type WebRec = {
   lang: string;
@@ -17,7 +22,7 @@ type WebRec = {
 
 /** Tap-to-talk: listens in the background, runs the command, reports a one-line status. */
 export function useVoice() {
-  const { mutate } = useData();
+  const { db, mutate } = useData();
   const [listening, setListening] = useState(false);
   const [status, setStatus] = useState<{ msg: string; ok: boolean } | null>(null);
   const web = useRef<WebRec | null>(null);
@@ -30,16 +35,32 @@ export function useVoice() {
   }, []);
 
   const handle = useCallback(
-    (text: string) => {
-      const intent = parseCommand(text);
-      if (intent.kind === "unknown") return say(NOT_UNDERSTOOD, false);
-      let err: string | null = null;
-      mutate((d) => {
-        err = runIntent(d, intent);
+    async (text: string) => {
+      say("Thinking…", true);
+      const today = todayISO();
+      // Gemini first; if it's unreachable or finds nothing, fall back to keyword spotting.
+      let intents = await understand(text, {
+        today,
+        weekday: WEEKDAYS[dayOfWeek(today)],
+        courses: getCourses(db).map((c) => c.name),
       });
-      say(err ?? describe(intent), !err);
+      if (!intents?.length) {
+        const k = parseCommand(text);
+        intents = k.kind === "unknown" ? [] : [k];
+      }
+      if (!intents.length) return say(NOT_UNDERSTOOD, false);
+      const msgs: string[] = [];
+      let failed = false;
+      mutate((d) => {
+        for (const i of intents!) {
+          const err = runIntent(d, i);
+          if (err) failed = true;
+          msgs.push(err ?? describe(i));
+        }
+      });
+      say(msgs.join(" · "), !failed);
     },
-    [mutate, say],
+    [db, mutate, say],
   );
 
   const toggle = useCallback(async () => {
