@@ -13,6 +13,10 @@ assert.deepEqual(p("mark maths present", T), { kind: "attendance", course: "math
 assert.deepEqual(p("I was absent for physics", T), { kind: "attendance", course: "physics", status: "ABSENT" });
 assert.deepEqual(p("schedule dentist tomorrow at 5 pm", T), { kind: "event", title: "dentist", date: "2026-11-04", time: "17:00" });
 assert.deepEqual(p("add event team meeting on friday at 10:30 am", T), { kind: "event", title: "team meeting", date: "2026-11-06", time: "10:30" });
+assert.deepEqual(p("I spent two hundred and fifty on lunch", T), { kind: "expense", amount: 25000, item: "lunch" });
+assert.deepEqual(p("spent one thousand five hundred for groceries", T), { kind: "expense", amount: 150000, item: "groceries" });
+assert.deepEqual(p("schedule dentist tomorrow at five pm", T), { kind: "event", title: "dentist", date: "2026-11-04", time: "17:00" });
+assert.deepEqual(p("add task call twenty one people", T), { kind: "task", title: "call 21 people" });
 assert.equal(p("what's the weather", T).kind, "unknown");
 assert.equal(p("", T).kind, "unknown");
 console.log("voice parser ok");

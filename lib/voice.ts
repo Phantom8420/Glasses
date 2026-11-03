@@ -37,13 +37,35 @@ function around(s: string, m: RegExpMatchArray): string {
   return tidy(s.slice(i + m[0].length)) || tidy(s.slice(0, i));
 }
 
+const SMALL = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(" ");
+const TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split(" ");
+const NUMWORD = new RegExp(
+  `\\b(?:${[...SMALL, ...TENS.slice(2), "hundred", "thousand"].join("|")})(?:[\\s-]+(?:and\\s+)?(?:${[...SMALL, ...TENS.slice(2), "hundred", "thousand"].join("|")}))*\\b`,
+  "gi",
+);
+
+/** "two hundred and fifty" -> "250". Runs of number words only; digits pass through. */
+export function numberWords(s: string): string {
+  return s.replace(NUMWORD, (run) => {
+    let total = 0, cur = 0;
+    for (const w of run.toLowerCase().split(/[\s-]+/)) {
+      if (w === "and") continue;
+      if (w === "hundred") cur = (cur || 1) * 100;
+      else if (w === "thousand") { total += (cur || 1) * 1000; cur = 0; }
+      else if (SMALL.includes(w)) cur += SMALL.indexOf(w);
+      else cur += TENS.indexOf(w) * 10;
+    }
+    return String(total + cur);
+  });
+}
+
 /**
  * Keyword spotting, not grammar: the recognizer often mangles the verb
  * ("at task"), so we look for the noun and take the rest as the content.
- * shortcut: spoken number words ("two hundred") aren't parsed, digits only.
+ * shortcut: "five thirty" style clock times aren't parsed, say "5:30" or "five pm".
  */
 export function parseCommand(raw: string, today = todayISO()): Intent {
-  const s = raw.trim().replace(/\s+/g, " ");
+  const s = numberWords(raw.trim().replace(/\s+/g, " "));
   let m: RegExpMatchArray | null;
 
   if ((m = s.match(/\b(present|absent|attended|attending)\b/i))) {
