@@ -6,8 +6,6 @@ import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 import { useData } from "../DataProvider";
 import { btn, Card, cx, SectionTitle } from "../ui";
 import { describe, parseCommand, runIntent, type Intent } from "@/lib/voice";
-import { getCourses } from "@/lib/store";
-import { getAIKey, parseWithAI } from "@/lib/voiceAI";
 
 // Web Speech API isn't in lib.dom.d.ts everywhere.
 type Rec = {
@@ -33,8 +31,6 @@ export function VoiceScreen() {
   const [listening, setListening] = useState(false);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<Intent[]>([]);
-  const [clean, setClean] = useState("");
-  const [thinking, setThinking] = useState(false);
   const [log, setLog] = useState<{ msg: string; ok: boolean }[]>([]);
   const rec = useRef<Rec | null>(null);
 
@@ -105,33 +101,11 @@ export function VoiceScreen() {
     setListening(true);
   }
 
-  // Parse whenever the transcript settles (mic stopped or typed). With an API key the
-  // model cleans the text and may return several actions; otherwise the rule parser runs.
+  // Parse whenever the transcript settles (mic stopped or typed).
   useEffect(() => {
-    setClean("");
-    if (listening || !text.trim()) { setPending([]); setThinking(false); return; }
-    const rules = () => {
-      const i = parseCommand(text);
-      setPending(i.kind === "unknown" ? [] : [i]);
-    };
-    if (!getAIKey()) { rules(); return; }
-    let stale = false;
-    setThinking(true);
-    // Debounce so typing doesn't fire a request per keystroke.
-    const t = setTimeout(() => {
-      parseWithAI(text, getCourses(db).map((c) => c.name)).then(
-        (r) => { if (stale) return; setClean(r.clean); setPending(r.intents); setThinking(false); },
-        (e) => {
-          if (stale) return;
-          const msg = e instanceof Error ? e.message : "AI unavailable";
-          setLog((l) => [{ msg: `${msg}. Used basic matching.`, ok: false }, ...l].slice(0, 20));
-          rules(); setThinking(false);
-        },
-      );
-    }, 400);
-    return () => { stale = true; clearTimeout(t); };
-    // db is read once per transcript, not a trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (listening || !text.trim()) { setPending([]); return; }
+    const i = parseCommand(text);
+    setPending(i.kind === "unknown" ? [] : [i]);
   }, [text, listening]);
 
   function saveAs(kind: "task" | "note") {
@@ -157,7 +131,7 @@ export function VoiceScreen() {
 
   if (!ready) return <p className="py-16 text-center text-sm text-text-secondary">Loading…</p>;
 
-  const unrecognised = !listening && !thinking && text.trim() && pending.length === 0;
+  const unrecognised = !listening && text.trim() && pending.length === 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -191,10 +165,6 @@ export function VoiceScreen() {
         className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
       />
 
-      {thinking && <p className="text-sm text-text-secondary">Understanding…</p>}
-      {clean && clean !== text.trim() && (
-        <p className="text-sm text-text-secondary">Cleaned up: “{clean}”</p>
-      )}
       {pending.length > 0 && (
         <Card className="flex items-center justify-between gap-3 p-3">
           <ul className="flex flex-col gap-1 text-sm">

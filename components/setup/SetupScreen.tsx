@@ -12,7 +12,6 @@ import { LoadOddSem2026 } from "./LoadOddSem2026";
 import { RecurringEventManager } from "./RecurringEventManager";
 import { DeleteTimetable } from "./DeleteTimetable";
 import { CurrencyForm } from "./CurrencyForm";
-import { AIKeyForm } from "./AIKeyForm";
 import { FeaturesForm } from "./FeaturesForm";
 import { ThemeForm } from "./ThemeForm";
 
@@ -56,7 +55,6 @@ export function SetupScreen() {
         <SectionTitle>General</SectionTitle>
         <ThemeForm />
         <CurrencyForm />
-        <AIKeyForm />
       </section>
 
       <section className="flex flex-col gap-4">
