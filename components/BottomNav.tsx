@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "./ui";
 import { useData } from "./DataProvider";
+import { useVoice } from "./voice/useVoice";
 
 export type Tab = {
   id: string;
@@ -152,6 +153,7 @@ export const TABS: Tab[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const { db } = useData();
+  const { listening, status, toggle } = useVoice();
   // Voice is always on; it sits in the middle as a raised round button.
   const voice = TABS.find((t) => t.id === "voice")!;
   const tabs = TABS.filter(
@@ -160,11 +162,41 @@ export function BottomNav() {
   tabs.splice(Math.floor(tabs.length / 2), 0, voice);
 
   return (
+    <>
+    {status && (
+      <div
+        role="status"
+        className={cx(
+          "fixed inset-x-4 bottom-24 z-50 mx-auto max-w-md rounded-md border border-border bg-surface px-3 py-2 text-center text-sm shadow-lg",
+          status.ok ? "text-text-primary" : "text-red-500",
+        )}
+      >
+        {status.msg}
+      </div>
+    )}
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {tabs.map((tab) => {
+          if (tab.id === "voice")
+            return (
+              <button
+                key={tab.id}
+                onClick={toggle}
+                aria-label={listening ? "Stop listening" : "Start voice command"}
+                className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-text-secondary"
+              >
+                <span
+                  className={cx(
+                    "-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-lg ring-4 ring-bg",
+                    listening && "animate-pulse brightness-110",
+                  )}
+                >
+                  {tab.icon(listening)}
+                </span>
+                <span>{listening ? "Listening" : tab.label}</span>
+              </button>
+            );
           const active = tab.isActive(pathname);
-          const mic = tab.id === "voice";
           return (
             <Link
               key={tab.href}
@@ -175,23 +207,13 @@ export function BottomNav() {
                 active ? "text-accent" : "text-text-secondary",
               )}
             >
-              {mic ? (
-                <span
-                  className={cx(
-                    "-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-lg ring-4 ring-bg",
-                    active && "brightness-110",
-                  )}
-                >
-                  {tab.icon(active)}
-                </span>
-              ) : (
-                tab.icon(active)
-              )}
+              {tab.icon(active)}
               <span>{tab.label}</span>
             </Link>
           );
         })}
       </div>
     </nav>
+    </>
   );
 }
