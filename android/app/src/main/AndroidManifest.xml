@@ -32,9 +32,9 @@
     <!-- Permissions -->
 
     <!--
-      Still no networking: the WebView loads its assets from inside the APK
-      and all data lives in on-device storage. INTERNET was only ever needed
-      by the AI features, which have been removed.
+      INTERNET is only for Google's speech recognizer and the optional Voice AI
+      call to Anthropic (Voice tab, user-supplied key). The WebView loads its
+      assets from inside the APK and all data lives in on-device storage.
 
       POST_NOTIFICATIONS (Android 13+) is used solely to alert on overdue
       tasks via on-device local notifications (lib/notifications.ts).
@@ -42,6 +42,7 @@
       RECORD_AUDIO is requested when the Voice mic is first tapped; speech
       is handled by the system recognizer, the app stores no audio.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

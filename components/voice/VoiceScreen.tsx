@@ -6,6 +6,8 @@ import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 import { useData } from "../DataProvider";
 import { btn, Card, cx, SectionTitle } from "../ui";
 import { describe, parseCommand, runIntent, type Intent } from "@/lib/voice";
+import { getCourses } from "@/lib/store";
+import { getAIKey, parseWithAI } from "@/lib/voiceAI";
 
 // Web Speech API isn't in lib.dom.d.ts everywhere.
 type Rec = {
@@ -26,11 +28,13 @@ const EXAMPLES = [
 ];
 
 export function VoiceScreen() {
-  const { ready, mutate } = useData();
+  const { db, ready, mutate } = useData();
   const [supported, setSupported] = useState(true);
   const [listening, setListening] = useState(false);
   const [text, setText] = useState("");
-  const [pending, setPending] = useState<Intent | null>(null);
+  const [pending, setPending] = useState<Intent[]>([]);
+  const [clean, setClean] = useState("");
+  const [thinking, setThinking] = useState(false);
   const [log, setLog] = useState<{ msg: string; ok: boolean }[]>([]);
   const rec = useRef<Rec | null>(null);
 
@@ -73,7 +77,7 @@ export function VoiceScreen() {
         setLog((l) => [{ msg: "Microphone permission denied. Allow it in Android settings, or type a command.", ok: false }, ...l]);
         return;
       }
-      setText(""); setPending(null);
+      setText(""); setPending([]);
       setListening(true);
       const r = await SpeechRecognition.start({
         language: navigator.language || "en-US",
@@ -96,16 +100,38 @@ export function VoiceScreen() {
     if (native.current) { void toggleNative(); return; }
     if (!rec.current) return;
     if (listening) { rec.current.stop(); return; }
-    setText(""); setPending(null);
+    setText(""); setPending([]);
     rec.current.start();
     setListening(true);
   }
 
-  // Parse whenever the transcript settles (mic stopped or typed).
+  // Parse whenever the transcript settles (mic stopped or typed). With an API key the
+  // model cleans the text and may return several actions; otherwise the rule parser runs.
   useEffect(() => {
-    if (listening || !text.trim()) { setPending(null); return; }
-    const i = parseCommand(text);
-    setPending(i.kind === "unknown" ? null : i);
+    setClean("");
+    if (listening || !text.trim()) { setPending([]); setThinking(false); return; }
+    const rules = () => {
+      const i = parseCommand(text);
+      setPending(i.kind === "unknown" ? [] : [i]);
+    };
+    if (!getAIKey()) { rules(); return; }
+    let stale = false;
+    setThinking(true);
+    // Debounce so typing doesn't fire a request per keystroke.
+    const t = setTimeout(() => {
+      parseWithAI(text, getCourses(db).map((c) => c.name)).then(
+        (r) => { if (stale) return; setClean(r.clean); setPending(r.intents); setThinking(false); },
+        (e) => {
+          if (stale) return;
+          const msg = e instanceof Error ? e.message : "AI unavailable";
+          setLog((l) => [{ msg: `${msg}. Used basic matching.`, ok: false }, ...l].slice(0, 20));
+          rules(); setThinking(false);
+        },
+      );
+    }, 400);
+    return () => { stale = true; clearTimeout(t); };
+    // db is read once per transcript, not a trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, listening]);
 
   function saveAs(kind: "task" | "note") {
@@ -117,17 +143,21 @@ export function VoiceScreen() {
   }
 
   function confirm() {
-    if (!pending) return;
-    const intent = pending;
-    let err: string | null = null;
-    mutate((d) => { err = runIntent(d, intent); });
-    setLog((l) => [{ msg: err ?? describe(intent), ok: !err }, ...l].slice(0, 20));
-    setText(""); setPending(null);
+    const intents = pending;
+    const results: { msg: string; ok: boolean }[] = [];
+    mutate((d) => {
+      for (const i of intents) {
+        const err = runIntent(d, i);
+        results.push({ msg: err ?? describe(i), ok: !err });
+      }
+    });
+    setLog((l) => [...results.reverse(), ...l].slice(0, 20));
+    setText(""); setPending([]);
   }
 
   if (!ready) return <p className="py-16 text-center text-sm text-text-secondary">Loading…</p>;
 
-  const unrecognised = !listening && text.trim() && !pending;
+  const unrecognised = !listening && !thinking && text.trim() && pending.length === 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -161,11 +191,17 @@ export function VoiceScreen() {
         className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
       />
 
-      {pending && (
+      {thinking && <p className="text-sm text-text-secondary">Understanding…</p>}
+      {clean && clean !== text.trim() && (
+        <p className="text-sm text-text-secondary">Cleaned up: “{clean}”</p>
+      )}
+      {pending.length > 0 && (
         <Card className="flex items-center justify-between gap-3 p-3">
-          <span className="text-sm">{describe(pending)}</span>
+          <ul className="flex flex-col gap-1 text-sm">
+            {pending.map((i, n) => <li key={n}>{describe(i)}</li>)}
+          </ul>
           <span className="flex shrink-0 gap-1">
-            <button className={cx(btn.base, btn.ghost)} onClick={() => { setText(""); setPending(null); }}>Cancel</button>
+            <button className={cx(btn.base, btn.ghost)} onClick={() => { setText(""); setPending([]); }}>Cancel</button>
             <button className={cx(btn.base, btn.primary)} onClick={confirm}>Do it</button>
           </span>
         </Card>
