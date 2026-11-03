@@ -18,7 +18,7 @@ export type Intent =
   | { kind: "task"; title: string }
   | { kind: "note"; text: string }
   | { kind: "expense"; amount: number; item: string }
-  | { kind: "attendance"; course: string; status: "ATTENDED" | "ABSENT" }
+  | { kind: "attendance"; course: string; status: "ATTENDED" | "ABSENT" | "CANCELLED"; time?: string | null; date?: string }
   | { kind: "event"; title: string; date: string; time: string | null }
   | { kind: "unknown" };
 
@@ -44,7 +44,7 @@ const NUMWORD = new RegExp(
   "gi",
 );
 
-/** "two hundred and fifty" -> "250". Runs of number words only; digits pass through. */
+/** "two hundred and fifty" -> "250"; "240 pm" -> "2:40 pm". Runs of number words only; other digits pass through. */
 export function numberWords(s: string): string {
   return s.replace(NUMWORD, (run) => {
     let total = 0, cur = 0;
@@ -56,7 +56,37 @@ export function numberWords(s: string): string {
       else cur += TENS.indexOf(w) * 10;
     }
     return String(total + cur);
-  });
+  }).replace(/\b(\d{1,2})(\d{2})\s*([ap])\.?m\b/gi, "$1:$2 $3m");
+}
+
+/** Pulls a day word ("tomorrow", "friday") out of s. */
+function dayWord(s: string, today: string): { date: string; rest: string } {
+  const day = s.match(/\b(today|tomorrow|day after tomorrow|(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday))\b/i);
+  if (!day) return { date: today, rest: s };
+  const w = day[1].toLowerCase();
+  let date = today;
+  if (w === "tomorrow") date = addDays(today, 1);
+  else if (w === "day after tomorrow") date = addDays(today, 2);
+  else if (w !== "today") {
+    const diff = (WEEKDAYS.indexOf(day[2].toLowerCase()) - dayOfWeek(today) + 7) % 7;
+    date = addDays(today, diff || 7);
+  }
+  return { date, rest: s.replace(day[0], " ") };
+}
+
+/** Pulls a clock time out of s as HH:MM. A bare "at 5" is assumed to be afternoon. */
+function clockTime(s: string): { time: string | null; rest: string } {
+  const t =
+    s.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?(?=\W|$)/i) ??
+    s.match(/\b(?:at\s+)?(\d{1,2}):(\d{2})()(?=\W|$)/i) ??
+    s.match(/\bat\s+(\d{1,2})(?::(\d{2}))?()(?=\W|$)/i);
+  if (!t) return { time: null, rest: s };
+  let h = Number(t[1]);
+  const ap = t[3]?.toLowerCase();
+  if (ap === "p") h = (h % 12) + 12;
+  else if (ap === "a") h = h % 12;
+  else if (h < 8) h += 12;
+  return { time: `${String(h).padStart(2, "0")}:${t[2] ?? "00"}`, rest: s.replace(t[0], " ") };
 }
 
 /**
@@ -67,6 +97,13 @@ export function numberWords(s: string): string {
 export function parseCommand(raw: string, today = todayISO()): Intent {
   const s = numberWords(raw.trim().replace(/\s+/g, " "));
   let m: RegExpMatchArray | null;
+
+  if (/\bcancel(?:l?ed)?\b/i.test(s)) {
+    const d = dayWord(s, today);
+    const c = clockTime(d.rest);
+    const course = tidy(c.rest.replace(/\b(?:cancel(?:l?ed)?|class|classes|lecture|session|the|my|at|for|of)\b/gi, " "));
+    if (course || c.time) return { kind: "attendance", course, status: "CANCELLED", time: c.time, date: d.date };
+  }
 
   if ((m = s.match(/\b(present|absent|attended|attending)\b/i))) {
     const course = tidy(
@@ -92,32 +129,10 @@ export function parseCommand(raw: string, today = todayISO()): Intent {
   }
 
   if (/\b(schedule|calendar|events?|meeting|appointment)\b/i.test(s)) {
-    let rest = s;
-    let date = today;
-    let time: string | null = null;
-    const day = rest.match(/\b(today|tomorrow|day after tomorrow|(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday))\b/i);
-    if (day) {
-      const w = day[1].toLowerCase();
-      if (w === "tomorrow") date = addDays(today, 1);
-      else if (w === "day after tomorrow") date = addDays(today, 2);
-      else if (w !== "today") {
-        const diff = (WEEKDAYS.indexOf(day[2].toLowerCase()) - dayOfWeek(today) + 7) % 7;
-        date = addDays(today, diff || 7);
-      }
-      rest = rest.replace(day[0], " ");
-    }
-    const t =
-      rest.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?(?=\W|$)/i) ??
-      rest.match(/\bat\s+(\d{1,2})(?::(\d{2}))?()(?=\W|$)/i);
-    if (t) {
-      let h = Number(t[1]);
-      const ap = t[3]?.toLowerCase();
-      if (ap === "p") h = (h % 12) + 12;
-      else if (ap === "a") h = h % 12;
-      else if (h < 8) h += 12; // "at 5" with no am/pm: assume afternoon
-      time = `${String(h).padStart(2, "0")}:${t[2] ?? "00"}`;
-      rest = rest.replace(t[0], " ");
-    }
+    const d = dayWord(s, today);
+    const c = clockTime(d.rest);
+    const { date } = d;
+    const { time, rest } = c;
     const kw = rest.match(/\b(?:schedule|calendar|events?|appointment)\b/i);
     const title = kw ? around(rest, kw) : tidy(rest);
     return { kind: "event", title: title || "Event", date, time };
@@ -139,7 +154,13 @@ export function describe(i: Intent): string {
     case "task": return `Added task “${i.title}”`;
     case "note": return `Saved note “${i.text}”`;
     case "expense": return `Logged ${(i.amount / 100).toFixed(2)} for “${i.item}”`;
-    case "attendance": return `Marked ${i.course} ${i.status === "ATTENDED" ? "present" : "absent"} today`;
+    case "attendance": {
+      const what = [i.course, i.time && `${i.time} class`].filter(Boolean).join(" ");
+      const when = !i.date || i.date === todayISO() ? "today" : i.date;
+      return i.status === "CANCELLED"
+        ? `Cancelled ${what || "class"} ${when}`
+        : `Marked ${what} ${i.status === "ATTENDED" ? "present" : "absent"} ${when}`;
+    }
     case "event": return `Scheduled “${i.title}” ${i.date === todayISO() ? "today" : i.date}${i.time ? ` at ${i.time}` : ""}`;
     default: return NOT_UNDERSTOOD;
   }
@@ -169,16 +190,24 @@ export function runIntent(db: DB, i: Intent): string | null {
       return null;
     }
     case "attendance": {
-      const q = i.course.toLowerCase();
-      const words = q.split(/\s+/).filter((w) => w.length > 2);
-      const courses = getCourses(db);
-      const course =
-        courses.find((c) => c.name.toLowerCase().includes(q) || q.includes(c.name.toLowerCase())) ??
-        courses.find((c) => words.some((w) => c.name.toLowerCase().includes(w)));
-      if (!course) return `No course matching “${i.course}”.`;
-      const slot = getSlotsForDay(db, dayOfWeek(today)).find((s) => s.course_id === course.id);
-      if (!slot) return `${course.name} has no class today.`;
-      markAttendance(db, { courseId: course.id, date: today, startTime: slot.start_time, endTime: slot.end_time }, i.status);
+      const date = i.date ?? today;
+      let slots = getSlotsForDay(db, dayOfWeek(date));
+      let course = null;
+      if (i.course) {
+        const q = i.course.toLowerCase();
+        const words = q.split(/\s+/).filter((w) => w.length > 2);
+        const courses = getCourses(db);
+        course =
+          courses.find((c) => c.name.toLowerCase().includes(q) || q.includes(c.name.toLowerCase())) ??
+          courses.find((c) => words.some((w) => c.name.toLowerCase().includes(w))) ??
+          null;
+        if (!course) return `No course matching “${i.course}”.`;
+        slots = slots.filter((s) => s.course_id === course!.id);
+      }
+      if (i.time) slots = slots.filter((s) => s.start_time.slice(0, 5) === i.time);
+      const slot = slots[0];
+      if (!slot) return `No ${course ? course.name : ""} class${i.time ? ` at ${i.time}` : ""} ${date === today ? "today" : "on " + date}.`.replace("No  ", "No ");
+      markAttendance(db, { courseId: slot.course_id, date, startTime: slot.start_time, endTime: slot.end_time }, i.status);
       return null;
     }
     default:
