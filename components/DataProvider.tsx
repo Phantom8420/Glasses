@@ -6,12 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { type DB, emptyDB, runRecurring, purgeOldDoneTasks } from "@/lib/store";
 import { loadDB, saveDB, resetStore } from "@/lib/persist";
 import { todayISO } from "@/lib/time";
 import { syncNotifications } from "@/lib/notifications";
+import { refreshOss, ossDeps, type RefreshResult } from "@/lib/oss";
 
 interface DataContextValue {
   db: DB;
@@ -20,6 +22,10 @@ interface DataContextValue {
   mutate: (fn: (draft: DB) => void) => void;
   /** Wipe back to fresh sample data. */
   reset: () => void;
+  /** Once-a-day GitHub refresh; the 24h lock lives inside refreshOss. */
+  refreshOssNow: () => Promise<RefreshResult>;
+  ossResult: RefreshResult | null;
+  ossBusy: boolean;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -27,6 +33,11 @@ const DataContext = createContext<DataContextValue | null>(null);
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [db, setDb] = useState<DB>(() => emptyDB());
   const [ready, setReady] = useState(false);
+  const [ossResult, setOssResult] = useState<RefreshResult | null>(null);
+  const [ossBusy, setOssBusy] = useState(false);
+  // Latest state, readable synchronously: refreshOss must persist its lock
+  // before the next HTTP call, so it cannot wait for a render.
+  const dbRef = useRef(db);
 
   useEffect(() => {
     let active = true;
@@ -40,6 +51,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const changed =
           runRecurring(loaded, today) + purgeOldDoneTasks(loaded, today);
         if (changed > 0) void saveDB(loaded);
+        dbRef.current = loaded;
         setDb(loaded);
         setReady(true);
       })
@@ -48,7 +60,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         // with an empty store rather than hanging on "Loading…" forever.
         console.error("loadDB failed", err);
         if (active) {
-          setDb(emptyDB());
+          dbRef.current = emptyDB();
+          setDb(dbRef.current);
           setReady(true);
         }
       });
@@ -89,20 +102,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [ready, notifySignature]);
 
   const mutate = useCallback((fn: (draft: DB) => void) => {
-    setDb((prev) => {
-      const draft = structuredClone(prev);
-      fn(draft);
-      void saveDB(draft);
-      return draft;
+    const draft = structuredClone(dbRef.current);
+    fn(draft);
+    dbRef.current = draft;
+    void saveDB(draft);
+    setDb(draft);
+  }, []);
+
+  const refreshOssNow = useCallback(async () => {
+    setOssBusy(true);
+    try {
+      const r = await refreshOss(
+        ossDeps(
+          () => dbRef.current.oss,
+          (fn) => mutate((d) => fn(d.oss)),
+        ),
+      );
+      setOssResult(r);
+      return r;
+    } finally {
+      setOssBusy(false);
+    }
+  }, [mutate]);
+
+  // Opening the app calls the same locked function; at most one fetch a day.
+  useEffect(() => {
+    if (ready) void refreshOssNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  const reset = useCallback(() => {
+    void resetStore().then((fresh) => {
+      dbRef.current = fresh;
+      setDb(fresh);
     });
   }, []);
 
-  const reset = useCallback(() => {
-    void resetStore().then((fresh) => setDb(fresh));
-  }, []);
-
   return (
-    <DataContext.Provider value={{ db, ready, mutate, reset }}>
+    <DataContext.Provider value={{ db, ready, mutate, reset, refreshOssNow, ossResult, ossBusy }}>
       {children}
     </DataContext.Provider>
   );

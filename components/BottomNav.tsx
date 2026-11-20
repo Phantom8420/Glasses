@@ -148,12 +148,37 @@ export const TABS: Tab[] = [
       </svg>
     ),
   },
+  {
+    href: "/oss",
+    id: "oss",
+    blurb: "Open-source contributions: repos, activity and what you still owe each one",
+    label: "OSS",
+    isActive: (p) => p.startsWith("/oss"),
+    icon: () => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-6 w-6"
+      >
+        <circle cx="6" cy="5.5" r="2.2" />
+        <circle cx="6" cy="18.5" r="2.2" />
+        <circle cx="18" cy="9" r="2.2" />
+        <path d="M6 7.7v8.6" />
+        <path d="M18 11.2c0 3.3-5 2.3-11 5.4" />
+      </svg>
+    ),
+  },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { db } = useData();
   const { listening, status, toggle } = useVoice();
+  if (pathname.startsWith("/oss")) return null; // the mini-app has its own nav
   // Voice is always on; it sits in the middle as a raised round button.
   const voice = TABS.find((t) => t.id === "voice")!;
   const tabs = TABS.filter(

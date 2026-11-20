@@ -30,6 +30,7 @@ import type {
   GoalStatus,
   Note,
 } from "./types";
+import { emptyOss, type OssData, type Standpoint } from "./oss";
 import { dayOfWeek, toISODate } from "./time";
 // money.ts imports only the DB *type* from here, so this is not a runtime cycle.
 import { materialiseRecurring } from "./money";
@@ -45,7 +46,7 @@ import { materialiseRecurring } from "./money";
 // ---------------------------------------------------------------------------
 
 /** Tab ids; keep in sync with TABS in components/BottomNav.tsx. */
-export const ALL_FEATURES = ["calendar", "studies", "tracker", "money", "learning"];
+export const ALL_FEATURES = ["calendar", "studies", "tracker", "money", "learning", "oss"];
 
 export interface DB {
   semester: Semester | null;
@@ -71,6 +72,9 @@ export interface DB {
   goals: LearningGoal[];
   resources: LearningResource[];
   notes: Note[];
+  oss: OssData;
+  /** Manual per-repo requirements (forms, CLAs); a refresh never touches these. */
+  ossStandpoints: Record<string, Standpoint[]>;
   settings: Settings;
   seq: number; // auto-increment id source
 }
@@ -100,6 +104,8 @@ export function emptyDB(): DB {
     goals: [],
     resources: [],
     notes: [],
+    oss: emptyOss(),
+    ossStandpoints: {},
     settings: { currency: "₹", features: null },
     seq: 1,
   };
@@ -301,6 +307,12 @@ export function normalizeDB(input: unknown): DB {
     goals: d.goals ?? [],
     resources: d.resources ?? [],
     notes: d.notes ?? [],
+    oss: {
+      ...base.oss,
+      ...d.oss,
+      sources: { ...base.oss.sources, ...d.oss?.sources },
+    },
+    ossStandpoints: d.ossStandpoints ?? {},
     settings: {
       currency: d.settings?.currency || "₹",
       // A save from before onboarding existed keeps every tab; only a fresh
@@ -318,6 +330,13 @@ export function normalizeDB(input: unknown): DB {
   // Give it the starter set. An *empty* array means the user deleted them —
   // leave that alone.
   if (d.categories === undefined) seedFinanceDefaults(next);
+  // Offer the OSS tab once to installs that predate it (a null features list
+  // is still in onboarding and already includes everything).
+  if (!next.oss.tabOffered) {
+    next.oss.tabOffered = true;
+    const f = next.settings.features;
+    if (f && !f.includes("oss")) next.settings.features = [...f, "oss"];
+  }
   mergeDuplicateCourses(next);
   return next;
 }
@@ -1534,4 +1553,25 @@ export function setTopicConfidence(
 export function deleteExamTopic(db: DB, examId: number, topicId: number) {
   const e = db.exams.find((x) => x.id === examId);
   if (e) e.topics = e.topics.filter((t) => t.id !== topicId);
+}
+
+export function addStandpoint(db: DB, repo: string, label: string, link?: string) {
+  const list = (db.ossStandpoints[repo] ??= []);
+  if (list.some((s) => s.label.toLowerCase() === label.toLowerCase())) return;
+  list.push({ id: nextId(db), label, status: "todo", ...(link ? { link } : {}) });
+}
+
+export function setStandpointStatus(
+  db: DB,
+  repo: string,
+  id: number,
+  status: "todo" | "done" | "n/a",
+) {
+  const s = db.ossStandpoints[repo]?.find((x) => x.id === id);
+  if (s) s.status = status;
+}
+
+export function removeStandpoint(db: DB, repo: string, id: number) {
+  const list = db.ossStandpoints[repo];
+  if (list) db.ossStandpoints[repo] = list.filter((x) => x.id !== id);
 }
